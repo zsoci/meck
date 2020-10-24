@@ -253,8 +253,8 @@ handle_call({set_expect, Expect}, From,
     FuncAri = {Func, Ari} = meck_expect:func_ari(Expect),
     case validate_expect(Mod, Func, Ari, S#state.can_expect) of
         ok ->
-            {NewExpects, CompilerPid} = store_expect(Mod, FuncAri, Expect,
-                                                     Expects, MergeExpects),
+            {NewExpects, CompilerPid} = store_expect(Mod, FuncAri, Expect, Expects,
+                                                     MergeExpects, S#state.passthrough),
             {noreply, S#state{expects = NewExpects,
                               reload = {CompilerPid, From}}};
         {error, Reason} ->
@@ -519,18 +519,25 @@ validate_expect(Mod, Func, Ari, CanExpect) ->
     end.
 
 -spec store_expect(Mod::atom(), meck_expect:func_ari(),
-                   meck_expect:expect(), Expects::meck_dict(), boolean()) ->
+                   meck_expect:expect(), Expects::meck_dict(), boolean(), boolean()) ->
         {NewExpects::meck_dict(), CompilerPid::pid()}.
-store_expect(Mod, FuncAri, Expect, Expects, true) ->
+store_expect(Mod, FuncAri, Expect, Expects, true, PassThrough) ->
     NewExpects = case dict:is_key(FuncAri, Expects) of
         true ->
             {FuncAri, ExistingClauses} = dict:fetch(FuncAri, Expects),
             {FuncAri, NewClauses} = Expect,
-            dict:store(FuncAri, {FuncAri, ExistingClauses ++ NewClauses}, Expects);
+            ToStore = case PassThrough of
+                          false ->
+                              ExistingClauses ++ NewClauses;
+                          true ->
+                              [LastClause | RevHead] = lists:reverse(ExistingClauses),
+                              lists:reverse(RevHead, NewClauses) ++ [LastClause]
+                      end,
+          dict:store(FuncAri, {FuncAri, ToStore}, Expects);
         false -> dict:store(FuncAri, Expect, Expects)
     end,
     compile_expects(Mod, NewExpects);
-store_expect(Mod, FuncAri, Expect, Expects, false) ->
+store_expect(Mod, FuncAri, Expect, Expects, false, _) ->
     NewExpects =  dict:store(FuncAri, Expect, Expects),
     compile_expects(Mod, NewExpects).
 
