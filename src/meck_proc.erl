@@ -526,7 +526,7 @@ store_expect(Mod, FuncAri, Expect, Expects, true) ->
         true ->
             {FuncAri, ExistingClauses} = dict:fetch(FuncAri, Expects),
             {FuncAri, NewClauses} = Expect,
-            dict:store(FuncAri, {FuncAri, ExistingClauses ++ NewClauses}, Expects);
+            dict:store(FuncAri, {FuncAri, NewClauses ++ ExistingClauses}, Expects);
         false -> dict:store(FuncAri, Expect, Expects)
     end,
     compile_expects(Mod, NewExpects);
